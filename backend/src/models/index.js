@@ -28,6 +28,8 @@ const Ride = require('./Ride')(sequelize, Sequelize.DataTypes);
 const Location = require('./Location')(sequelize, Sequelize.DataTypes);
 const Notification = require('./Notification')(sequelize, Sequelize.DataTypes);
 const Message = require('./Message')(sequelize, Sequelize.DataTypes);
+const Attendance = require('./Attendance')(sequelize, Sequelize.DataTypes);
+const Appointment = require('./Appointment')(sequelize, Sequelize.DataTypes);
 
 // Definir associações
 const db = {
@@ -38,7 +40,9 @@ const db = {
   Ride,
   Location,
   Notification,
-  Message
+  Message,
+  Attendance,
+  Appointment
 };
 
 // Associações User
@@ -72,5 +76,23 @@ Notification.belongsTo(User, { foreignKey: 'userId' });
 Message.belongsTo(User, { as: 'sender', foreignKey: 'senderId' });
 Message.belongsTo(User, { as: 'recipient', foreignKey: 'recipientId' });
 Message.belongsTo(Ride, { foreignKey: 'rideId' });
+
+// Associações Attendance (Atendimentos) - definindo sem constraints para evitar erros FK
+Attendance.belongsTo(User, { as: 'operator', foreignKey: 'operatorId', constraints: false });
+Attendance.belongsTo(User, { as: 'supervisor', foreignKey: 'supervisorId', constraints: false });
+Attendance.belongsTo(Ride, { foreignKey: 'rideId', constraints: false });
+User.hasMany(Attendance, { as: 'operatorAttendances', foreignKey: 'operatorId', constraints: false });
+User.hasMany(Attendance, { as: 'supervisorAttendances', foreignKey: 'supervisorId', constraints: false });
+Ride.hasOne(Attendance, { foreignKey: 'rideId', constraints: false });
+
+// Associações Appointment (Agendamentos) - definindo sem constraints para evitar erros FK
+Appointment.belongsTo(User, { as: 'creator', foreignKey: 'createdBy', constraints: false });
+Appointment.belongsTo(User, { as: 'operator', foreignKey: 'operatorId', constraints: false });
+Appointment.belongsTo(Ride, { foreignKey: 'rideId', constraints: false });
+Appointment.belongsTo(Appointment, { as: 'parentAppointment', foreignKey: 'parentAppointmentId', constraints: false });
+Appointment.hasMany(Appointment, { as: 'childAppointments', foreignKey: 'parentAppointmentId', constraints: false });
+User.hasMany(Appointment, { as: 'createdAppointments', foreignKey: 'createdBy', constraints: false });
+User.hasMany(Appointment, { as: 'operatorAppointments', foreignKey: 'operatorId', constraints: false });
+Ride.hasOne(Appointment, { foreignKey: 'rideId', constraints: false });
 
 module.exports = db;

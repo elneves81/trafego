@@ -20,9 +20,10 @@ export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
 
   useEffect(() => {
+
     if (user && localStorage.getItem('token')) {
       // Conectar ao servidor WebSocket
-      const socketInstance = io(process.env.REACT_APP_API_URL || 'http://10.0.50.79:8089', {
+      const socketInstance = io(process.env.REACT_APP_API_URL || 'http://10.0.134.79:8082', {
         auth: {
           token: localStorage.getItem('token'),
           userId: user.id,

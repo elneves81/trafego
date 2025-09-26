@@ -3,6 +3,23 @@ const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 
+// Função para normalizar campos de texto para maiúsculas
+const normalizeTextFields = (data) => {
+  const textFields = [
+    'name', 'address'
+  ];
+
+  const normalizedData = { ...data };
+  
+  textFields.forEach(field => {
+    if (normalizedData[field] && typeof normalizedData[field] === 'string') {
+      normalizedData[field] = normalizedData[field].toUpperCase().trim();
+    }
+  });
+
+  return normalizedData;
+};
+
 const getUsers = async (req, res) => {
   try {
     const {
@@ -131,12 +148,15 @@ const createUser = async (req, res) => {
       emergencyPhone
     } = req.body;
 
+    // Converter CPF para apenas números (para salvar no banco)
+    const cpfOnly = cpf ? cpf.replace(/\D/g, '') : null;
+
     // Verificar se usuário já existe
     const existingUser = await User.findOne({
       where: {
         [Op.or]: [
           { email },
-          { cpf }
+          { cpf: cpfOnly }
         ]
       }
     });
@@ -148,12 +168,13 @@ const createUser = async (req, res) => {
       });
     }
 
-    const user = await User.create({
+    // Normalizar campos de texto para maiúsculas
+    const userData = normalizeTextFields({
       name,
       email,
       password,
       phone,
-      cpf,
+      cpf: cpfOnly,
       userType,
       dateOfBirth,
       address,
@@ -162,6 +183,8 @@ const createUser = async (req, res) => {
       emergencyContact,
       emergencyPhone
     });
+
+    const user = await User.create(userData);
 
     logger.info(`User created by admin: ${user.email} (${user.userType})`);
 
@@ -205,7 +228,10 @@ const updateUser = async (req, res) => {
     // Não permitir alterar senha por aqui
     delete updateData.password;
 
-    await user.update(updateData);
+    // Normalizar campos de texto para maiúsculas
+    const normalizedUpdateData = normalizeTextFields(updateData);
+
+    await user.update(normalizedUpdateData);
 
     logger.info(`User updated: ${user.email}`);
 

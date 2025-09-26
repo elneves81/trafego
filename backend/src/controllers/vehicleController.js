@@ -114,8 +114,13 @@ const getVehicleById = async (req, res) => {
 
 const createVehicle = async (req, res) => {
   try {
+    console.log('=== DEBUG POST /api/vehicles ===');
+    console.log('Body recebido:', JSON.stringify(req.body, null, 2));
+    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.error('Erro de validação no POST /api/vehicles:', JSON.stringify(errors.array(), null, 2));
+      console.error('Dados recebidos:', JSON.stringify(req.body, null, 2));
       return res.status(400).json({
         success: false,
         message: 'Dados inválidos',

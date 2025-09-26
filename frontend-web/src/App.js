@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 
 import { useAuth } from './contexts/AuthContext';
-import { SocketProvider } from './contexts/SocketContext';
+import { SSEProvider } from './contexts/SSEContext';
 import Layout from './components/Layout/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -41,15 +41,28 @@ function App() {
 
   // Função para determinar qual dashboard mostrar baseado no tipo de usuário
   const getDashboardComponent = () => {
+    console.log('🔍 DEBUG - Determinando dashboard para usuário:', {
+      userType: user.userType,
+      userName: user.name,
+      userEmail: user.email,
+      fullUser: user
+    });
+    
     switch (user.userType) {
       case 'admin':
+        console.log('➡️ Redirecionando para DashboardAdminPage (admin)');
         return <DashboardAdminPage />;
       case 'operator':
-      case 'supervisor':
+        console.log('➡️ Redirecionando para DashboardOperatorPage (operator)');
         return <DashboardOperatorPage />; // Dashboard específico para operadores/atendentes
+      case 'supervisor':
+        console.log('➡️ Redirecionando para DashboardOperatorPage (supervisor)');
+        return <DashboardOperatorPage />; // Dashboard específico para supervisores
       case 'driver':
+        console.log('➡️ Redirecionando para DashboardDriverPage (driver)');
         return <DashboardDriverPage />; // Dashboard específico para motoristas
       default:
+        console.log('⚠️ UserType não reconhecido, usando DashboardAdminPage como fallback:', user.userType);
         return <DashboardAdminPage />;
     }
   };
@@ -61,7 +74,7 @@ function App() {
   };
 
   return (
-    <SocketProvider>
+    <SSEProvider>
       <Layout>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -92,7 +105,7 @@ function App() {
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </Layout>
-    </SocketProvider>
+    </SSEProvider>
   );
 }
 

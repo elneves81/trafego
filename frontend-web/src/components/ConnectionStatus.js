@@ -11,7 +11,7 @@ import {
   Wifi as WifiIcon,
   WifiOff as WifiOffIcon
 } from '@mui/icons-material';
-import { useSocket } from '../contexts/SocketContext';
+import { useSocket } from '../contexts/SocketCompatibility';
 
 const ConnectionStatus = ({ variant = 'chip', showUsers = true }) => {
   const theme = useTheme();

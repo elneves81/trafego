@@ -46,7 +46,7 @@ import {
 } from '@mui/icons-material';
 
 import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
+import { useSocket } from '../contexts/SocketCompatibility';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 
 const DashboardPage = () => {

@@ -19,7 +19,7 @@ import {
   Message as MessageIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
-import { useSocket } from '../contexts/SocketContext';
+import { useSocket } from '../contexts/SocketCompatibility';
 
 const NotificationCenter = () => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -71,7 +71,7 @@ const NotificationCenter = () => {
     return time.toLocaleDateString();
   };
 
-  const unreadCount = notifications.length;
+  const unreadCount = Array.isArray(notifications) ? notifications.length : 0;
 
   return (
     <>
@@ -122,7 +122,7 @@ const NotificationCenter = () => {
         </Box>
 
         <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-          {notifications.length === 0 ? (
+          {!Array.isArray(notifications) || notifications.length === 0 ? (
             <Box sx={{ p: 3, textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
                 Nenhuma notificação
@@ -185,7 +185,7 @@ const NotificationCenter = () => {
                   </Box>
                 </MenuItem>
                 
-                {index < notifications.length - 1 && <Divider />}
+                {index < (Array.isArray(notifications) ? notifications.length : 0) - 1 && <Divider />}
               </React.Fragment>
             ))
           )}

@@ -66,8 +66,8 @@ const createRideValidation = [
     .withMessage('Solicitante deve ter entre 2 e 100 caracteres'),
   body('contactPhone')
     .optional()
-    .isMobilePhone('pt-BR')
-    .withMessage('Telefone de contato inválido'),
+    .matches(/^\(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage('Telefone deve estar no formato (00) 00000-0000'),
   body('vehicleId')
     .optional()
     .isUUID()

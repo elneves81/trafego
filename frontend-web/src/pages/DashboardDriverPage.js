@@ -35,7 +35,7 @@ import {
 } from '@mui/icons-material';
 
 import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
+import { useSocket } from '../contexts/SocketCompatibility';
 
 const DashboardDriverPage = () => {
   const { user } = useAuth();
@@ -150,9 +150,11 @@ const DashboardDriverPage = () => {
     });
 
     return () => {
-      socket.off('ride_assigned');
-      socket.off('chat_message');
-      socket.off('ride_cancelled');
+      if (socket && typeof socket.off === 'function') {
+        socket.off('ride_assigned');
+        socket.off('chat_message');
+        socket.off('ride_cancelled');
+      }
     };
   }, [socket, currentRide]);
 

@@ -25,6 +25,10 @@ export const AuthProvider = ({ children }) => {
       // Verificar se o token é válido
       api.get('/auth/me')
         .then(response => {
+          console.log('🔍 Verificando token, resposta:', response.data);
+          console.log('🎯 DEBUG /auth/me - UserType recebido:', response.data.user?.userType);
+          console.log('📧 DEBUG /auth/me - Email recebido:', response.data.user?.email);
+          // Agora a resposta vem como { success: true, user: {...} }
           setUser(response.data.user);
         })
         .catch(error => {
@@ -41,23 +45,27 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const response = await axios.post('http://10.0.50.79:8089/api/auth/login', credentials, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
+      console.log('🔐 Iniciando login...', credentials.email);
+      const response = await api.post('/auth/login', credentials);
+      console.log('📡 Resposta do login:', response.data);
       
       // A resposta tem estrutura: { success: true, data: { user, token } }
       const { token: newToken, user: userData } = response.data.data;
+      console.log('🎟️ Token recebido:', newToken ? 'Token válido' : 'Token inválido');
+      console.log('👤 Usuário recebido:', userData);
+      console.log('🔍 DEBUG - UserType específico:', userData.userType);
+      console.log('📧 DEBUG - Email usado no login:', credentials.email);
       
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('token', newToken);
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
       
+      console.log('✅ Login concluído com sucesso');
+      console.log('🎯 DEBUG - User setado no contexto:', userData);
       return { success: true };
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error('❌ Erro no login:', error);
       return { 
         success: false, 
         message: error.response?.data?.message || 'Erro ao fazer login' 

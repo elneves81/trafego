@@ -1,7 +1,13 @@
 import { createTheme } from '@mui/material/styles';
 
+// Criar tema base primeiro sem customizações
+const baseTheme = createTheme();
+
+// Criar tema completo extendendo o base
 const theme = createTheme({
+  ...baseTheme,
   palette: {
+    mode: 'light',
     primary: {
       main: '#1976d2',
       light: '#42a5f5',
@@ -166,6 +172,21 @@ const theme = createTheme({
           },
           '&:hover': {
             backgroundColor: '#f5f5f5',
+          },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          textTransform: 'none',
+          fontWeight: 500,
+        },
+        contained: {
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: 'none',
           },
         },
       },

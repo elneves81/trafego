@@ -43,5 +43,8 @@
     "backend",
     "frontend-web",
     "mobile-app"
-  ]
+  ],
+  "dependencies": {
+    "axios": "^1.12.2"
+  }
 }

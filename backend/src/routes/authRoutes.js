@@ -27,12 +27,12 @@ const registerValidation = [
     .isLength({ min: 6 })
     .withMessage('Senha deve ter no mínimo 6 caracteres'),
   body('phone')
-    .isMobilePhone('pt-BR')
-    .withMessage('Telefone inválido'),
+    .matches(/^\(\d{2}\) \d{4,5}-\d{4}$/)
+    .withMessage('Telefone deve estar no formato (00) 00000-0000'),
   body('cpf')
     .isLength({ min: 11, max: 11 })
     .isNumeric()
-    .withMessage('CPF deve ter 11 dígitos numéricos'),
+    .withMessage('CPF deve ter exatamente 11 dígitos numéricos'),
   body('userType')
     .isIn(['admin', 'operator', 'driver', 'supervisor'])
     .withMessage('Tipo de usuário inválido')

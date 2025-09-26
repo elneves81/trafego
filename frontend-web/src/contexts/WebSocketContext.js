@@ -36,7 +36,7 @@ export const WebSocketProvider = ({ children }) => {
       return; // Já conectado
     }
 
-    const socketUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://localhost:3001';
+    const socketUrl = process.env.REACT_APP_WEBSOCKET_URL || 'http://10.0.134.79:8082';
     
     const socketConnection = io(socketUrl, {
       auth: {

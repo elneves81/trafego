@@ -77,6 +77,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATEONLY,
       allowNull: true
     },
+    licenseCategory: {
+      type: DataTypes.STRING(10),
+      allowNull: true // Obrigatório apenas para motoristas
+    },
     emergencyContact: {
       type: DataTypes.STRING,
       allowNull: true

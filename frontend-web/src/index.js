@@ -8,7 +8,6 @@ import { ToastContainer } from 'react-toastify';
 
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
-import { WebSocketProvider } from './contexts/WebSocketContext';
 import theme from './theme';
 
 import 'react-toastify/dist/ReactToastify.css';
@@ -33,21 +32,19 @@ root.render(
         <ThemeProvider theme={theme}>
           <CssBaseline />
           <AuthProvider>
-            <WebSocketProvider>
-              <App />
-              <ToastContainer
-                position="top-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-              />
-            </WebSocketProvider>
+            <App />
+            <ToastContainer
+              position="top-right"
+              autoClose={5000}
+              hideProgressBar={false}
+              newestOnTop={false}
+              closeOnClick
+              rtl={false}
+              pauseOnFocusLoss
+              draggable
+              pauseOnHover
+              theme="light"
+            />
           </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>

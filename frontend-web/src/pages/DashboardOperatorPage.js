@@ -19,7 +19,10 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Alert
+  Alert,
+  Tabs,
+  Tab,
+  Fab
 } from '@mui/material';
 import {
   LocalHospital,
@@ -32,17 +35,31 @@ import {
   Notifications,
   Schedule,
   LocalHospital as Emergency,
-  Send
+  Send,
+  Add as AddIcon,
+  Event as EventIcon,
+  Assessment as ReportIcon,
+  PersonAdd as BasicIcon
 } from '@mui/icons-material';
 
+// Import dos novos componentes
+import EmergencyAttendance from '../components/operator/EmergencyAttendance';
+import AttendanceList from '../components/operator/AttendanceList';
+import AppointmentScheduling from '../components/operator/AppointmentScheduling';
+import AppointmentList from '../components/operator/AppointmentList';
+import BasicAttendance from '../components/operator/BasicAttendance';
+import BasicAttendanceList from '../components/operator/BasicAttendanceList';
+import TestAppointmentList from '../components/operator/TestAppointmentList';
+
 import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
+import { useSocket } from '../contexts/SocketCompatibility';
 
 const DashboardOperatorPage = () => {
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
   
   // Estados
+  const [currentTab, setCurrentTab] = useState(0);
   const [incomingCalls, setIncomingCalls] = useState([]);
   const [activeRides, setActiveRides] = useState([]);
   const [availableVehicles, setAvailableVehicles] = useState([]);
@@ -50,6 +67,10 @@ const DashboardOperatorPage = () => {
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
+  const [showEmergencyForm, setShowEmergencyForm] = useState(false);
+  const [showAppointmentForm, setShowAppointmentForm] = useState(false);
+  const [showBasicAttendanceForm, setShowBasicAttendanceForm] = useState(false);
+  const [refreshAttendances, setRefreshAttendances] = useState(0);
 
   // Dados simulados para demonstração
   useEffect(() => {
@@ -111,9 +132,11 @@ const DashboardOperatorPage = () => {
     });
 
     return () => {
-      socket.off('new_call');
-      socket.off('ride_update');
-      socket.off('chat_message');
+      if (socket && typeof socket.off === 'function') {
+        socket.off('new_call');
+        socket.off('ride_update');
+        socket.off('chat_message');
+      }
     };
   }, [socket]);
 
@@ -188,17 +211,304 @@ const DashboardOperatorPage = () => {
     }
   };
 
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+  };
+
+  const renderTabContent = () => {
+    switch (currentTab) {
+      case 0:
+        return renderDashboardOverview();
+      case 1:
+        return showEmergencyForm ? <EmergencyAttendance /> : <AttendanceList />;
+      case 2:
+        return showBasicAttendanceForm ? (
+          <BasicAttendance 
+            onSuccess={() => {
+              setShowBasicAttendanceForm(false);
+              setRefreshAttendances(prev => prev + 1); // Força refresh da lista
+              setCurrentTab(1); // Redireciona para aba de corridas
+            }}
+          />
+        ) : renderBasicAttendanceList();
+      case 3:
+        return showAppointmentForm ? <AppointmentScheduling /> : renderAppointmentList();
+      case 4:
+        return renderReports();
+      default:
+        return renderDashboardOverview();
+    }
+  };
+
+  const renderDashboardOverview = () => (
+    <Grid container spacing={3}>
+      {/* Chamadas Pendentes */}
+      <Grid item xs={12} md={6}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Phone sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography variant="h6">
+                Chamadas Pendentes
+                <Badge badgeContent={incomingCalls.length} color="error" sx={{ ml: 1 }}>
+                  <Notifications />
+                </Badge>
+              </Typography>
+            </Box>
+
+            <List>
+              {incomingCalls.map((call) => (
+                <Paper key={call.id} sx={{ mb: 1, p: 2 }} elevation={2}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {call.caller}
+                        </Typography>
+                        <Chip 
+                          label={call.priority === 'emergency' ? 'EMERGÊNCIA' : 'URGENTE'} 
+                          color={getPriorityColor(call.priority)}
+                          size="small" 
+                          sx={{ ml: 1 }}
+                        />
+                      </Box>
+                      
+                      <Typography variant="body2" color="text.secondary">
+                        📞 {call.phone}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        📍 {call.location}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mt: 1 }}>
+                        {call.description}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        ⏰ {call.time.toLocaleTimeString()}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ ml: 2 }}>
+                      {availableVehicles.filter(v => v.status === 'disponivel').map(vehicle => (
+                        <Button
+                          key={vehicle.id}
+                          variant="contained"
+                          size="small"
+                          sx={{ mb: 1, display: 'block' }}
+                          onClick={() => handleAssignRide(call.id, vehicle.id)}
+                        >
+                          {vehicle.code}
+                        </Button>
+                      ))}
+                    </Box>
+                  </Box>
+                </Paper>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* Corridas Ativas */}
+      <Grid item xs={12} md={6}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <DirectionsCar sx={{ mr: 1, color: 'success.main' }} />
+              <Typography variant="h6">
+                Corridas Ativas ({activeRides.length})
+              </Typography>
+            </Box>
+
+            <List>
+              {activeRides.map((ride) => (
+                <Paper key={ride.id} sx={{ mb: 1, p: 2 }} elevation={2}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {ride.vehicle} - {ride.driver}
+                        </Typography>
+                        <Chip 
+                          label={ride.status.replace('_', ' ').toUpperCase()} 
+                          color="primary"
+                          size="small" 
+                          sx={{ ml: 1 }}
+                        />
+                      </Box>
+                      
+                      <Typography variant="body2" color="text.secondary">
+                        👤 Paciente: {ride.patient}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        📍 Origem: {ride.origin}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        🏥 Destino: {ride.destination}
+                      </Typography>
+                      {ride.startTime && (
+                        <Typography variant="caption" color="text.secondary">
+                          ⏰ Iniciado: {ride.startTime.toLocaleTimeString()}
+                        </Typography>
+                      )}
+                    </Box>
+                    
+                    <Box sx={{ ml: 2 }}>
+                      <IconButton 
+                        color="primary" 
+                        onClick={() => openChat(ride.driver)}
+                      >
+                        <Chat />
+                      </IconButton>
+                      <IconButton color="success">
+                        <LocationOn />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                </Paper>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* Veículos Disponíveis */}
+      <Grid item xs={12}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Status da Frota
+            </Typography>
+            
+            <Grid container spacing={2}>
+              {availableVehicles.map((vehicle) => (
+                <Grid item xs={12} sm={6} md={4} key={vehicle.id}>
+                  <Paper sx={{ p: 2 }} elevation={1}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {vehicle.code}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {vehicle.driver}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          📍 {vehicle.location}
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label={vehicle.status.toUpperCase()} 
+                        color={getStatusColor(vehicle.status)}
+                        size="small"
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+              ))}
+            </Grid>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  );
+
+  const renderBasicAttendanceList = () => <BasicAttendanceList key={refreshAttendances} />;
+
+  const renderAppointmentList = () => <AppointmentList />;
+
+  const renderReports = () => (
+    <Card>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          Relatórios e Estatísticas
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Relatórios de atendimentos e agendamentos serão implementados aqui.
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+
   return (
-    <Box sx={{ flexGrow: 1, p: 3 }}>
+    <Box sx={{ flexGrow: 1 }}>
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
+      <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h4" gutterBottom>
-          Central de Operações
+          Central de Operações - Gestor/Atendente
         </Typography>
         <Typography variant="h6" color="text.secondary">
           Bem-vindo(a), {user?.name} | Status: {isConnected ? 'Conectado' : 'Desconectado'}
         </Typography>
+      </Paper>
+
+      {/* Navigation Tabs */}
+      <Paper elevation={2} sx={{ mb: 3 }}>
+        <Tabs 
+          value={currentTab} 
+          onChange={handleTabChange} 
+          variant="scrollable"
+          scrollButtons="auto"
+        >
+          <Tab 
+            icon={<LocalHospital />} 
+            label="Painel Geral" 
+          />
+          <Tab 
+            icon={<Emergency />} 
+            label="Atendimentos de Emergência" 
+          />
+          <Tab 
+            icon={<BasicIcon />} 
+            label="Atendimento Básico" 
+          />
+          <Tab 
+            icon={<EventIcon />} 
+            label="Agendamentos" 
+          />
+          <Tab 
+            icon={<ReportIcon />} 
+            label="Relatórios" 
+          />
+        </Tabs>
+      </Paper>
+
+      {/* Tab Content */}
+      <Box sx={{ p: 3 }}>
+        {renderTabContent()}
       </Box>
+
+      {/* Floating Action Buttons */}
+      {currentTab === 1 && (
+        <Fab
+          color="error"
+          aria-label="nova emergência"
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => setShowEmergencyForm(!showEmergencyForm)}
+        >
+          <AddIcon />
+        </Fab>
+      )}
+
+      {currentTab === 2 && (
+        <Fab
+          color="info"
+          aria-label="novo atendimento básico"
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => setShowBasicAttendanceForm(!showBasicAttendanceForm)}
+        >
+          <AddIcon />
+        </Fab>
+      )}
+
+      {currentTab === 3 && (
+        <Fab
+          color="primary"
+          aria-label="novo agendamento"
+          sx={{ position: 'fixed', bottom: 16, right: 16 }}
+          onClick={() => setShowAppointmentForm(!showAppointmentForm)}
+        >
+          <AddIcon />
+        </Fab>
+      )}
 
       <Grid container spacing={3}>
         {/* Chamadas Pendentes */}

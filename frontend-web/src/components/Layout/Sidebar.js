@@ -34,7 +34,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { useAuth } from '../../contexts/AuthContext';
-import { useSocket } from '../../contexts/SocketContext';
+import { useSocket } from '../../contexts/SocketCompatibility';
 
 const Sidebar = ({ onItemClick }) => {
   const theme = useTheme();

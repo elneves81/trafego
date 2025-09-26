@@ -4,7 +4,6 @@ import { Outlet } from 'react-router-dom';
 
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
-import { SocketProvider } from '../../contexts/SocketContext';
 
 const DRAWER_WIDTH = 280;
 
@@ -18,19 +17,18 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <SocketProvider>
-      <Box sx={{ display: 'flex', height: '100vh' }}>
-        {/* TopBar */}
-        <TopBar onMenuClick={handleDrawerToggle} />
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+      {/* TopBar */}
+      <TopBar onMenuClick={handleDrawerToggle} />
 
-        {/* Sidebar */}
-        <Box
-          component="nav"
-          sx={{ 
-            width: { lg: DRAWER_WIDTH }, 
-            flexShrink: { lg: 0 } 
-          }}
-        >
+      {/* Sidebar */}
+      <Box
+        component="nav"
+        sx={{ 
+          width: { lg: DRAWER_WIDTH }, 
+          flexShrink: { lg: 0 } 
+        }}
+      >
           {isMobile ? (
             <Drawer
               variant="temporary"
@@ -95,7 +93,6 @@ const Layout = ({ children }) => {
           </Box>
         </Box>
       </Box>
-    </SocketProvider>
   );
 };
 
