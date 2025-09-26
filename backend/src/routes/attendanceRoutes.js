@@ -160,6 +160,56 @@ router.get('/',
   getAttendances
 );
 
+// Buscar atendimentos pendentes (deve vir antes de /:id)
+router.get('/pending', 
+  authenticate,
+  authorize('admin', 'supervisor', 'operator'),
+  async (req, res) => {
+    try {
+      console.log('=== BUSCANDO ATENDIMENTOS PENDENTES ===');
+      
+      const { Attendance } = require('../models');
+      
+      const pendingAttendances = await Attendance.findAll({
+        where: { 
+          status: 'pending' 
+        },
+        include: [
+          {
+            association: 'operator',
+            attributes: ['id', 'name', 'email', 'phone']
+          },
+          {
+            association: 'supervisor',
+            attributes: ['id', 'name', 'email', 'phone']
+          },
+          {
+            association: 'Ride',
+            include: [
+              {
+                association: 'driver',
+                attributes: ['id', 'name', 'phone']
+              },
+              {
+                association: 'Vehicle',
+                attributes: ['id', 'plateNumber', 'model', 'vehicleType']
+              }
+            ]
+          }
+        ],
+        order: [['createdAt', 'ASC']]
+      });
+
+      console.log(`✅ Encontrados ${pendingAttendances.length} atendimentos pendentes`);
+      res.json(pendingAttendances);
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar atendimentos pendentes:', error);
+      res.status(500).json({ message: 'Erro interno do servidor' });
+    }
+  }
+);
+
 // Buscar atendimento por ID
 router.get('/:id', 
   authenticate,

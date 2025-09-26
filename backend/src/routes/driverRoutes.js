@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const { authenticate } = require('../middleware/auth');
-const { User } = require('../models');
+const { User, Ride } = require('../models');
 const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 
@@ -129,6 +129,33 @@ router.get('/', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Erro ao buscar motoristas:', error);
     res.status(500).json({ message: 'Erro interno do servidor' });
+  }
+});
+
+// GET /api/drivers/available - Buscar motoristas disponíveis (deve vir antes de /:id)
+router.get('/available', authenticate, async (req, res) => {
+  try {
+    console.log('=== BUSCANDO MOTORISTAS DISPONÍVEIS ===');
+    console.log('🔍 User model disponível:', !!User);
+    console.log('🔍 Req.user:', req.user);
+    
+    // Buscar motoristas ativos (query simplificada para teste)
+    const drivers = await User.findAll({
+      where: {
+        userType: 'driver',
+        status: 'active'
+      },
+      attributes: ['id', 'name', 'phone', 'email', 'status'],
+      order: [['name', 'ASC']]
+    });
+    
+    console.log(`✅ Encontrados ${drivers.length} motoristas disponíveis`);
+    console.log('📋 Motoristas formatados:', drivers.map(d => ({ id: d.id, name: d.name })));
+    res.json(drivers);
+  } catch (error) {
+    console.error('❌ Erro ao buscar motoristas disponíveis:', error);
+    console.error('❌ Stack:', error.stack);
+    res.status(500).json({ message: 'Erro interno do servidor', error: error.message });
   }
 });
 

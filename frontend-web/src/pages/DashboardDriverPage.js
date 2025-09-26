@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Grid,
@@ -36,6 +36,7 @@ import {
 
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketCompatibility';
+import api from '../services/api';
 
 const DashboardDriverPage = () => {
   const { user } = useAuth();
@@ -50,50 +51,55 @@ const DashboardDriverPage = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Estados do veículo
   const [vehicleStatus, setVehicleStatus] = useState('disponivel');
   const [shift, setShift] = useState('ativo');
 
-  // Dados simulados para demonstração
-  useEffect(() => {
-    setAvailableRides([
-      {
-        id: 1,
-        patient: 'José Silva',
-        origin: 'Rua das Flores, 123 - Centro',
-        destination: 'Hospital Regional',
-        priority: 'emergency',
-        distance: '2.5 km',
-        estimatedTime: '8 min',
-        description: 'Idoso com dificuldades respiratórias',
-        assignedAt: new Date()
-      },
-      {
-        id: 2,
-        patient: 'Maria Santos',
-        origin: 'Av. Brasil, 456 - Vila Nova', 
-        destination: 'Hospital Municipal',
-        priority: 'urgent',
-        distance: '1.8 km',
-        estimatedTime: '6 min',
-        description: 'Mulher grávida com contrações',
-        assignedAt: new Date(Date.now() - 300000)
-      }
-    ]);
-
-    setRideHistory([
-      {
-        id: 'hist1',
-        patient: 'Pedro Costa',
-        origin: 'Rua A, 100',
-        destination: 'Hospital Regional',
-        completedAt: new Date(Date.now() - 3600000),
-        duration: '45 min',
-        status: 'concluida'
-      }
-    ]);
+  // Carregar corridas disponíveis da API
+  const loadAvailableRides = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/rides/available');
+      setAvailableRides(response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar corridas:', error);
+      setError('Erro ao carregar corridas disponíveis');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Carregar corrida atual
+  const loadCurrentRide = useCallback(async () => {
+    try {
+      const response = await api.get('/rides/current');
+      setCurrentRide(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar corrida atual:', error);
+    }
+  }, []);
+
+  // Carregar histórico de corridas
+  const loadRideHistory = useCallback(async () => {
+    try {
+      const response = await api.get('/rides/history');
+      setRideHistory(response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar histórico:', error);
+    }
+  }, []);
+
+  // Carregar dados iniciais
+  useEffect(() => {
+    if (user) {
+      loadAvailableRides();
+      loadCurrentRide();
+      loadRideHistory();
+    }
+  }, [user, loadAvailableRides, loadCurrentRide, loadRideHistory]);
 
   // Geolocalização
   useEffect(() => {
@@ -132,110 +138,262 @@ const DashboardDriverPage = () => {
 
   // Socket listeners
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !user) return;
 
-    socket.on('ride_assigned', (ride) => {
-      setAvailableRides(prev => [ride, ...prev]);
+    console.log('🔌 Driver WebSocket conectado para:', user.email);
+
+    // Registrar como motorista online
+    socket.emit('driver_online', {
+      userId: user.id,
+      name: user.name,
+      email: user.email,
+      status: vehicleStatus,
+      location: currentLocation
     });
 
+    // Escutar nova corrida atribuída
+    socket.on('ride_assigned', (ride) => {
+      console.log('🚨 Nova corrida recebida:', ride);
+      setAvailableRides(prev => {
+        const exists = prev.find(r => r.id === ride.id);
+        if (exists) return prev;
+        return [ride, ...prev];
+      });
+      
+      // Notificação sonora/visual
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Nova Corrida!', {
+          body: `Paciente: ${ride.patientName || 'N/I'}\nDestino: ${ride.destination}`,
+          icon: '/favicon.ico'
+        });
+      }
+    });
+
+    // Escutar mensagens do chat
     socket.on('chat_message', (message) => {
       setChatHistory(prev => [...prev, message]);
     });
 
+    // Escutar cancelamento de corrida
     socket.on('ride_cancelled', (rideId) => {
+      console.log('❌ Corrida cancelada:', rideId);
       setAvailableRides(prev => prev.filter(r => r.id !== rideId));
-      if (currentRide && currentRide.id === rideId) {
+      if (currentRide?.id === rideId) {
         setCurrentRide(null);
       }
     });
 
+    // Escutar atualização de status
+    socket.on('status_update', (data) => {
+      console.log('📊 Atualização de status:', data);
+    });
+
+    // Cleanup
     return () => {
-      if (socket && typeof socket.off === 'function') {
+      if (socket) {
+        socket.emit('driver_offline', { userId: user.id });
         socket.off('ride_assigned');
         socket.off('chat_message');
         socket.off('ride_cancelled');
+        socket.off('status_update');
       }
     };
-  }, [socket, currentRide]);
+  }, [socket, user, vehicleStatus, currentLocation]);
 
-  const acceptRide = (ride) => {
-    setCurrentRide({
-      ...ride,
-      status: 'aceita',
-      acceptedAt: new Date()
-    });
-    setAvailableRides(prev => prev.filter(r => r.id !== ride.id));
-    
-    if (socket) {
-      socket.emit('ride_accepted', {
-        rideId: ride.id,
+  // Aceitar corrida
+  const acceptRide = async (ride) => {
+    try {
+      setLoading(true);
+      
+      const response = await api.post(`/rides/${ride.id}/accept`, {
         driverId: user.id,
-        acceptedAt: new Date()
+        acceptedAt: new Date().toISOString(),
+        location: currentLocation
       });
-    }
-  };
 
-  const rejectRide = (rideId) => {
-    setAvailableRides(prev => prev.filter(r => r.id !== rideId));
-    
-    if (socket) {
-      socket.emit('ride_rejected', {
-        rideId: rideId,
-        driverId: user.id,
-        rejectedAt: new Date()
-      });
-    }
-  };
-
-  const updateRideStatus = (status) => {
-    if (currentRide) {
-      const updatedRide = {
-        ...currentRide,
-        status: status,
-        [`${status}At`]: new Date()
-      };
-      setCurrentRide(updatedRide);
-
+      const acceptedRide = response.data;
+      setCurrentRide(acceptedRide);
+      setAvailableRides(prev => prev.filter(r => r.id !== ride.id));
+      
+      // Notificar via WebSocket
       if (socket) {
-        socket.emit('ride_status_update', updatedRide);
+        socket.emit('ride_accepted', {
+          rideId: ride.id,
+          driverId: user.id,
+          driverName: user.name,
+          acceptedAt: new Date().toISOString(),
+          location: currentLocation
+        });
       }
 
+      console.log('✅ Corrida aceita:', acceptedRide);
+    } catch (error) {
+      console.error('Erro ao aceitar corrida:', error);
+      setError('Erro ao aceitar corrida. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Rejeitar corrida
+  const rejectRide = async (rideId) => {
+    try {
+      await api.post(`/rides/${rideId}/reject`, {
+        driverId: user.id,
+        rejectedAt: new Date().toISOString(),
+        reason: 'Motorista rejeitou'
+      });
+
+      setAvailableRides(prev => prev.filter(r => r.id !== rideId));
+      
+      // Notificar via WebSocket
+      if (socket) {
+        socket.emit('ride_rejected', {
+          rideId: rideId,
+          driverId: user.id,
+          driverName: user.name,
+          rejectedAt: new Date().toISOString()
+        });
+      }
+
+      console.log('❌ Corrida rejeitada:', rideId);
+    } catch (error) {
+      console.error('Erro ao rejeitar corrida:', error);
+      setError('Erro ao rejeitar corrida.');
+    }
+  };
+
+  // Atualizar status da corrida
+  const updateRideStatus = async (status) => {
+    if (!currentRide) return;
+
+    try {
+      setLoading(true);
+
+      const response = await api.put(`/rides/${currentRide.id}/status`, {
+        status: status,
+        driverId: user.id,
+        location: currentLocation,
+        timestamp: new Date().toISOString()
+      });
+
+      const updatedRide = response.data;
+      setCurrentRide(updatedRide);
+
+      // Notificar via WebSocket
+      if (socket) {
+        socket.emit('ride_status_update', {
+          rideId: currentRide.id,
+          status: status,
+          driverId: user.id,
+          driverName: user.name,
+          location: currentLocation,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      // Se concluída, mover para histórico
       if (status === 'concluida') {
         setRideHistory(prev => [updatedRide, ...prev]);
         setCurrentRide(null);
+        loadAvailableRides(); // Recarregar corridas disponíveis
       }
+
+      console.log('📊 Status atualizado:', status);
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      setError('Erro ao atualizar status da corrida.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const openChat = () => {
+  // Abrir chat e carregar histórico
+  const openChat = async () => {
     setChatOpen(true);
-    // Carregar histórico do chat
-    setChatHistory([
-      { sender: 'Central', message: 'Corrida atribuída. Confirme o recebimento.', time: new Date() },
-      { sender: user.name, message: 'Corrida recebida, a caminho do local', time: new Date() }
-    ]);
+    
+    try {
+      // Carregar histórico de mensagens
+      const response = await api.get(`/messages/history?rideId=${currentRide?.id || 'general'}`);
+      setChatHistory(response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar chat:', error);
+      // Usar dados de fallback
+      setChatHistory([
+        { 
+          sender: 'Central', 
+          message: 'Chat iniciado. Como posso ajudar?', 
+          timestamp: new Date().toISOString(),
+          type: 'system'
+        }
+      ]);
+    }
   };
 
-  const sendChatMessage = () => {
-    if (chatMessage.trim()) {
-      const message = {
-        sender: user.name,
-        recipient: 'Central',
+  // Enviar mensagem do chat
+  const sendChatMessage = async () => {
+    if (!chatMessage.trim()) return;
+
+    try {
+      const messageData = {
+        senderId: user.id,
+        senderName: user.name,
+        senderType: 'driver',
         message: chatMessage.trim(),
-        time: new Date()
+        rideId: currentRide?.id || null,
+        timestamp: new Date().toISOString()
       };
 
-      setChatHistory(prev => [...prev, message]);
+      // Enviar via API
+      await api.post('/messages/send', messageData);
+
+      // Adicionar à lista local
+      setChatHistory(prev => [...prev, messageData]);
       setChatMessage('');
 
+      // Enviar via WebSocket para tempo real
       if (socket) {
-        socket.emit('send_message', message);
+        socket.emit('chat_message', messageData);
       }
+
+      console.log('💬 Mensagem enviada:', messageData);
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      setError('Erro ao enviar mensagem.');
     }
   };
 
-  const toggleLocation = () => {
-    setLocationEnabled(!locationEnabled);
+  // Alternar localização GPS
+  const toggleLocation = async () => {
+    const newStatus = !locationEnabled;
+    setLocationEnabled(newStatus);
+
+    try {
+      // Atualizar status no backend
+      await api.put('/drivers/location-status', {
+        enabled: newStatus,
+        timestamp: new Date().toISOString()
+      });
+
+      // Notificar via WebSocket
+      if (socket) {
+        socket.emit('driver_location_status', {
+          driverId: user.id,
+          driverName: user.name,
+          locationEnabled: newStatus,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      console.log(`📍 GPS ${newStatus ? 'ativado' : 'desativado'}`);
+    } catch (error) {
+      console.error('Erro ao atualizar status de localização:', error);
+    }
+
+    // Solicitar permissão de notificação se ativando GPS
+    if (newStatus && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
   };
 
   const getPriorityColor = (priority) => {
@@ -272,7 +430,7 @@ const DashboardDriverPage = () => {
             size="small"
             startIcon={<MyLocation />}
             onClick={toggleLocation}
-            color={locationEnabled ? 'success' : 'default'}
+            color={locationEnabled ? 'success' : 'inherit'}
           >
             GPS {locationEnabled ? 'Ativo' : 'Inativo'}
           </Button>
@@ -563,7 +721,7 @@ const DashboardDriverPage = () => {
               placeholder="Digite sua mensagem..."
               value={chatMessage}
               onChange={(e) => setChatMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
+              onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
             />
             <Button 
               variant="contained" 

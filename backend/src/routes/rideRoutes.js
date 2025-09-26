@@ -167,4 +167,73 @@ router.put('/:id/assign', rideIdValidation, authorize('admin', 'supervisor', 'op
 router.put('/:id/status', rideIdValidation, authorize('admin', 'supervisor', 'operator', 'driver'), updateStatusValidation, updateRideStatus);
 router.put('/:id/cancel', rideIdValidation, authorize('admin', 'supervisor', 'operator'), cancelRideValidation, cancelRide);
 
+// POST /api/rides/assign - Nova rota para atribuir corridas (para compatibilidade com frontend)
+router.post('/assign', 
+  authenticate,
+  authorize('admin', 'supervisor', 'operator'),
+  [
+    body('attendanceId').notEmpty().withMessage('ID do atendimento é obrigatório'),
+    body('driverId').isUUID().withMessage('ID do motorista deve ser um UUID válido'),
+    body('driverEmail').isEmail().withMessage('Email do motorista deve ser válido'),
+    body('priority').optional().isIn(['low', 'normal', 'high', 'emergency']).withMessage('Prioridade inválida')
+  ],
+  async (req, res) => {
+    try {
+      console.log('=== ATRIBUINDO CORRIDA ===');
+      console.log('Dados recebidos:', req.body);
+      
+      const { attendanceId, driverId, driverEmail, priority } = req.body;
+      
+      // Buscar o atendimento
+      const { Attendance } = require('../models');
+      const attendance = await Attendance.findByPk(attendanceId);
+      
+      if (!attendance) {
+        return res.status(404).json({ message: 'Atendimento não encontrado' });
+      }
+      
+      if (attendance.status !== 'pending') {
+        return res.status(400).json({ message: 'Atendimento não está pendente' });
+      }
+      
+      // Criar corrida baseada no atendimento
+      const { Ride } = require('../models');
+      const ride = await Ride.create({
+        patientName: attendance.patientName || attendance.callerName,
+        patientDocument: attendance.patientDocument || attendance.patientCpf,
+        patientAge: attendance.patientAge,
+        patientCondition: attendance.medicalCondition,
+        priority: priority || 'normal',
+        rideType: attendance.attendanceType || 'emergency',
+        originAddress: `${attendance.address || ''}, ${attendance.city || ''} - ${attendance.state || ''}`,
+        destinationAddress: attendance.destinationAddress || 'Hospital Regional',
+        requestedDateTime: new Date(),
+        status: 'assigned',
+        driverId: driverId,
+        operatorId: req.user.id,
+        contactPhone: attendance.callerPhone,
+        notes: attendance.observations
+      });
+      
+      // Atualizar status do atendimento
+      await attendance.update({ 
+        status: 'assigned',
+        rideId: ride.id 
+      });
+      
+      console.log('✅ Corrida atribuída com sucesso:', ride.id);
+      
+      res.json({ 
+        success: true, 
+        rideId: ride.id,
+        message: 'Corrida atribuída com sucesso' 
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro ao atribuir corrida:', error);
+      res.status(500).json({ message: 'Erro interno do servidor' });
+    }
+  }
+);
+
 module.exports = router;

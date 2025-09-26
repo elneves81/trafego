@@ -1,52 +1,53 @@
 import { createTheme } from '@mui/material/styles';
 
-// Criar tema base primeiro sem customizações
-const baseTheme = createTheme();
-
-// Criar tema completo extendendo o base
+// Criar tema base robusто e completo
 const theme = createTheme({
-  ...baseTheme,
   palette: {
     mode: 'light',
     primary: {
       main: '#1976d2',
       light: '#42a5f5',
       dark: '#1565c0',
-      contrastText: '#fff',
+      contrastText: '#ffffff',
     },
     secondary: {
       main: '#dc004e',
       light: '#ff5983',
       dark: '#9a0036',
-      contrastText: '#fff',
+      contrastText: '#ffffff',
     },
     error: {
       main: '#d32f2f',
       light: '#ef5350',
       dark: '#c62828',
-      contrastText: '#fff',
+      contrastText: '#ffffff',
     },
     warning: {
       main: '#ed6c02',
       light: '#ff9800',
       dark: '#e65100',
-      contrastText: '#fff',
+      contrastText: '#ffffff',
     },
     info: {
       main: '#0288d1',
       light: '#03a9f4',
       dark: '#01579b',
-      contrastText: '#fff',
+      contrastText: '#ffffff',
     },
     success: {
       main: '#2e7d32',
       light: '#4caf50',
       dark: '#1b5e20',
-      contrastText: '#fff',
+      contrastText: '#ffffff',
     },
     background: {
       default: '#fafafa',
-      paper: '#fff',
+      paper: '#ffffff',
+    },
+    text: {
+      primary: 'rgba(0, 0, 0, 0.87)',
+      secondary: 'rgba(0, 0, 0, 0.6)',
+      disabled: 'rgba(0, 0, 0, 0.38)',
     },
   },
   typography: {
@@ -211,6 +212,17 @@ const theme = createTheme({
     borderRadius: 8,
   },
   spacing: 8,
+});
+
+// Verificação de segurança para garantir que o tema tem todas as propriedades necessárias
+if (!theme.palette?.primary?.main) {
+  console.error('❌ Tema não foi criado corretamente - primary.main ausente');
+}
+
+console.log('✅ Tema criado com sucesso:', {
+  primary: theme.palette?.primary?.main,
+  secondary: theme.palette?.secondary?.main,
+  mode: theme.palette?.mode
 });
 
 export default theme;

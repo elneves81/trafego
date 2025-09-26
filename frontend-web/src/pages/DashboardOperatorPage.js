@@ -63,6 +63,7 @@ const DashboardOperatorPage = () => {
   const [incomingCalls, setIncomingCalls] = useState([]);
   const [activeRides, setActiveRides] = useState([]);
   const [availableVehicles, setAvailableVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [chatMessage, setChatMessage] = useState('');
@@ -71,126 +72,373 @@ const DashboardOperatorPage = () => {
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [showBasicAttendanceForm, setShowBasicAttendanceForm] = useState(false);
   const [refreshAttendances, setRefreshAttendances] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Dados simulados para demonstração
+  // Carregar dados reais das APIs
   useEffect(() => {
-    setIncomingCalls([
-      {
-        id: 1,
-        caller: 'José Silva',
-        phone: '(47) 99999-1234',
-        location: 'Rua das Flores, 123 - Centro',
-        priority: 'emergency',
-        time: new Date(),
-        description: 'Idoso com dificuldades respiratórias'
-      },
-      {
-        id: 2,
-        caller: 'Maria Santos',
-        phone: '(47) 88888-5678',
-        location: 'Av. Brasil, 456 - Vila Nova',
-        priority: 'urgent',
-        time: new Date(Date.now() - 300000),
-        description: 'Mulher grávida com contrações'
-      }
-    ]);
-
-    setActiveRides([
-      {
-        id: 1,
-        driver: 'João Silva',
-        vehicle: 'AMB-001',
-        patient: 'Pedro Costa',
-        origin: 'Rua A, 100',
-        destination: 'Hospital Regional',
-        status: 'em_andamento',
-        startTime: new Date(Date.now() - 900000)
-      }
-    ]);
-
-    setAvailableVehicles([
-      { id: 1, code: 'AMB-001', driver: 'João Silva', status: 'disponivel', location: 'Base Central' },
-      { id: 2, code: 'AMB-002', driver: 'Pedro Santos', status: 'disponivel', location: 'Base Norte' },
-      { id: 3, code: 'AMB-003', driver: 'Carlos Lima', status: 'manutencao', location: 'Oficina' }
-    ]);
+    loadInitialData();
   }, []);
 
-  // Socket listeners
+  const loadInitialData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Carregar corridas ativas
+      await loadActiveRides();
+      
+      // Carregar veículos/motoristas disponíveis
+      await loadAvailableDrivers();
+      
+      // Carregar atendimentos pendentes
+      await loadPendingAttendances();
+      
+    } catch (err) {
+      console.error('❌ Erro ao carregar dados:', err);
+      setError('Erro ao carregar dados do sistema');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadActiveRides = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8082'}/api/rides/active`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const rides = await response.json();
+        setActiveRides(Array.isArray(rides) ? rides : []);
+        console.log('✅ Corridas ativas carregadas:', rides);
+      } else {
+        console.error('❌ Erro na API de corridas ativas:', response.status);
+        setActiveRides([]); // Garantir array vazio
+      }
+    } catch (err) {
+      console.error('❌ Erro ao carregar corridas ativas:', err);
+      setActiveRides([]); // Garantir array vazio
+    }
+  };
+
+  const loadAvailableDrivers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8082'}/api/drivers/available`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const driversData = await response.json();
+        setDrivers(Array.isArray(driversData) ? driversData : []);
+        
+        // Converter para formato de veículos para compatibilidade
+        const vehiclesData = (Array.isArray(driversData) ? driversData : []).map(driver => ({
+          id: driver.id,
+          code: driver.vehicle || `VEH-${driver.id}`,
+          driver: driver.name,
+          status: driver.status || 'disponivel',
+          location: driver.location || 'Base Central',
+          email: driver.email
+        }));
+        
+        setAvailableVehicles(vehiclesData);
+        console.log('✅ Motoristas disponíveis carregados:', driversData);
+      } else {
+        console.error('❌ Erro na API de motoristas:', response.status);
+        setDrivers([]);
+        setAvailableVehicles([]);
+      }
+    } catch (err) {
+      console.error('❌ Erro ao carregar motoristas:', err);
+      setDrivers([]);
+      setAvailableVehicles([]);
+    }
+  };
+
+  const loadPendingAttendances = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8082'}/api/attendances/pending`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const attendances = await response.json();
+        
+        // Converter atendimentos para formato de chamadas
+        const calls = (Array.isArray(attendances) ? attendances : []).map(att => ({
+          id: att.id,
+          caller: att.callerName || 'Nome não informado',
+          phone: att.callerPhone || 'Telefone não informado',
+          location: `${att.address || ''}, ${att.city || ''} - ${att.state || ''}`,
+          priority: att.type === 'emergency' ? 'emergency' : 'normal',
+          time: new Date(att.createdAt),
+          description: att.description || 'Sem descrição',
+          attendanceType: att.type
+        }));
+        
+        setIncomingCalls(calls);
+        console.log('✅ Atendimentos pendentes carregados:', calls);
+      } else {
+        console.error('❌ Erro na API de atendimentos pendentes:', response.status);
+        setIncomingCalls([]);
+      }
+    } catch (err) {
+      console.error('❌ Erro ao carregar atendimentos pendentes:', err);
+      setIncomingCalls([]);
+    }
+  };
+
+  // Socket listeners para comunicação em tempo real
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !isConnected) return;
 
-    socket.on('new_call', (call) => {
-      setIncomingCalls(prev => [call, ...prev]);
+    console.log('🔌 Configurando listeners do WebSocket para operador');
+
+    // Novo atendimento criado
+    socket.on('new_attendance', (attendance) => {
+      console.log('📞 Novo atendimento recebido:', attendance);
+      const newCall = {
+        id: attendance.id,
+        caller: attendance.callerName || 'Nome não informado',
+        phone: attendance.callerPhone || 'Telefone não informado',
+        location: `${attendance.address || ''}, ${attendance.city || ''} - ${attendance.state || ''}`,
+        priority: attendance.type === 'emergency' ? 'emergency' : 'normal',
+        time: new Date(attendance.createdAt),
+        description: attendance.description || 'Sem descrição',
+        attendanceType: attendance.type
+      };
+      setIncomingCalls(prev => [newCall, ...prev]);
     });
 
-    socket.on('ride_update', (ride) => {
-      setActiveRides(prev => prev.map(r => r.id === ride.id ? ride : r));
+    // Corrida aceita por motorista
+    socket.on('ride_accepted', (data) => {
+      console.log('✅ Corrida aceita por motorista:', data);
+      setActiveRides(prev => [...prev, data.ride]);
+      
+      // Remover da lista de chamadas pendentes
+      setIncomingCalls(prev => prev.filter(call => call.id !== data.attendanceId));
+      
+      // Atualizar status do motorista
+      setAvailableVehicles(prev => prev.map(vehicle => 
+        vehicle.email === data.driverEmail 
+          ? { ...vehicle, status: 'ocupado' }
+          : vehicle
+      ));
     });
 
+    // Corrida rejeitada por motorista
+    socket.on('ride_rejected', (data) => {
+      console.log('❌ Corrida rejeitada por motorista:', data);
+      // Corrida volta para lista de pendentes (pode ser atribuída a outro motorista)
+    });
+
+    // Status da corrida atualizado
+    socket.on('ride_status_update', (data) => {
+      console.log('🔄 Status da corrida atualizado:', data);
+      setActiveRides(prev => prev.map(ride => 
+        ride.id === data.rideId 
+          ? { ...ride, status: data.status, location: data.location }
+          : ride
+      ));
+      
+      // Se corrida foi finalizada, liberar motorista
+      if (data.status === 'finalizada') {
+        setAvailableVehicles(prev => prev.map(vehicle => 
+          vehicle.email === data.driverEmail 
+            ? { ...vehicle, status: 'disponivel' }
+            : vehicle
+        ));
+      }
+    });
+
+    // Motorista ficou online/offline
+    socket.on('driver_status_change', (data) => {
+      console.log('👤 Status do motorista alterado:', data);
+      setAvailableVehicles(prev => prev.map(vehicle => 
+        vehicle.email === data.email 
+          ? { ...vehicle, status: data.isOnline ? 'disponivel' : 'offline' }
+          : vehicle
+      ));
+    });
+
+    // Localização do motorista atualizada
+    socket.on('location_update', (data) => {
+      console.log('📍 Localização do motorista atualizada:', data);
+      setAvailableVehicles(prev => prev.map(vehicle => 
+        vehicle.email === data.email 
+          ? { ...vehicle, location: data.address || 'Localização em tempo real' }
+          : vehicle
+      ));
+    });
+
+    // Mensagem de chat recebida
     socket.on('chat_message', (message) => {
+      console.log('💬 Mensagem de chat recebida:', message);
       setChatHistory(prev => [...prev, message]);
     });
 
     return () => {
       if (socket && typeof socket.off === 'function') {
-        socket.off('new_call');
-        socket.off('ride_update');
+        socket.off('new_attendance');
+        socket.off('ride_accepted');
+        socket.off('ride_rejected');
+        socket.off('ride_status_update');
+        socket.off('driver_status_change');
+        socket.off('location_update');
         socket.off('chat_message');
       }
     };
-  }, [socket]);
+  }, [socket, isConnected]);
 
-  const handleAssignRide = (callId, vehicleId) => {
+  const handleAssignRide = async (callId, vehicleId) => {
     const call = incomingCalls.find(c => c.id === callId);
     const vehicle = availableVehicles.find(v => v.id === vehicleId);
     
-    if (call && vehicle) {
-      const newRide = {
-        id: Date.now(),
-        driver: vehicle.driver,
-        vehicle: vehicle.code,
-        patient: call.caller,
-        origin: call.location,
-        destination: 'Hospital Regional',
-        status: 'aguardando_aceite',
-        callId: call.id
-      };
+    if (!call || !vehicle) {
+      setError('Erro: Chamada ou veículo não encontrado');
+      return;
+    }
 
-      setActiveRides(prev => [...prev, newRide]);
-      setIncomingCalls(prev => prev.filter(c => c.id !== callId));
-      
-      // Emitir via socket
-      if (socket) {
-        socket.emit('assign_ride', newRide);
+    setLoading(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8082'}/api/rides/assign`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          attendanceId: callId,
+          driverId: vehicleId,
+          driverEmail: vehicle.email,
+          priority: call.priority
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Corrida atribuída com sucesso:', result);
+        
+        // Emitir evento via WebSocket para notificar o motorista
+        if (socket && isConnected) {
+          socket.emit('assign_ride', {
+            attendanceId: callId,
+            driverEmail: vehicle.email,
+            rideData: {
+              id: result.rideId,
+              patient: call.caller,
+              origin: call.location,
+              destination: 'A definir',
+              priority: call.priority,
+              description: call.description,
+              phone: call.phone
+            }
+          });
+        }
+        
+        // Atualizar UI localmente (o WebSocket confirmará depois)
+        setIncomingCalls(prev => prev.filter(c => c.id !== callId));
+        setAvailableVehicles(prev => prev.map(v => 
+          v.id === vehicleId 
+            ? { ...v, status: 'aguardando_confirmacao' }
+            : v
+        ));
+        
+      } else {
+        const errorData = await response.json();
+        setError(errorData.message || 'Erro ao atribuir corrida');
       }
+      
+    } catch (err) {
+      console.error('❌ Erro ao atribuir corrida:', err);
+      setError('Erro de comunicação com o servidor');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const openChat = (driver) => {
+  const openChat = async (driver) => {
     setSelectedDriver(driver);
     setChatOpen(true);
-    // Carregar histórico do chat
-    setChatHistory([
-      { sender: driver, message: 'Estou a caminho do local', time: new Date() },
-      { sender: 'Central', message: 'Ok, mantenha contato', time: new Date() }
-    ]);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8082'}/api/chat/history/${driver.email}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const history = await response.json();
+        setChatHistory(history);
+      } else {
+        setChatHistory([
+          { sender: driver.driver, message: 'Histórico não disponível', time: new Date() }
+        ]);
+      }
+    } catch (err) {
+      console.error('❌ Erro ao carregar histórico do chat:', err);
+      setChatHistory([
+        { sender: driver.driver, message: 'Erro ao carregar histórico', time: new Date() }
+      ]);
+    }
   };
 
-  const sendChatMessage = () => {
-    if (chatMessage.trim() && selectedDriver) {
-      const message = {
-        sender: 'Central',
-        recipient: selectedDriver,
-        message: chatMessage.trim(),
-        time: new Date()
-      };
+  const sendChatMessage = async () => {
+    if (!chatMessage.trim() || !selectedDriver) return;
 
-      setChatHistory(prev => [...prev, message]);
-      setChatMessage('');
+    const messageData = {
+      sender: user.name || 'Central',
+      senderType: 'operator',
+      recipient: selectedDriver.email,
+      recipientType: 'driver',
+      message: chatMessage.trim(),
+      time: new Date()
+    };
 
-      if (socket) {
-        socket.emit('send_message', message);
+    try {
+      // Salvar mensagem na API
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:8082'}/api/chat/send`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(messageData)
+      });
+
+      if (response.ok) {
+        // Atualizar UI localmente
+        setChatHistory(prev => [...prev, messageData]);
+        setChatMessage('');
+
+        // Enviar via WebSocket para tempo real
+        if (socket && isConnected) {
+          socket.emit('chat_message', messageData);
+        }
+      } else {
+        console.error('❌ Erro ao enviar mensagem');
       }
+    } catch (err) {
+      console.error('❌ Erro ao enviar mensagem:', err);
     }
   };
 
@@ -213,6 +461,24 @@ const DashboardOperatorPage = () => {
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
+  };
+
+  // Atualização periódica dos dados (a cada 30 segundos)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading) {
+        loadActiveRides();
+        loadAvailableDrivers();
+        loadPendingAttendances();
+      }
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  // Função para forçar atualização manual
+  const refreshData = () => {
+    loadInitialData();
   };
 
   const renderTabContent = () => {
@@ -432,12 +698,61 @@ const DashboardOperatorPage = () => {
     <Box sx={{ flexGrow: 1 }}>
       {/* Header */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Central de Operações - Gestor/Atendente
-        </Typography>
-        <Typography variant="h6" color="text.secondary">
-          Bem-vindo(a), {user?.name} | Status: {isConnected ? 'Conectado' : 'Desconectado'}
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h4" gutterBottom>
+              Central de Operações - Gestor/Atendente
+            </Typography>
+            <Typography variant="h6" color="text.secondary">
+              Bem-vindo(a), {user?.name}
+            </Typography>
+          </Box>
+          
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            {/* Status da Conexão WebSocket */}
+            <Chip
+              icon={isConnected ? <LocationOn /> : <Stop />}
+              label={isConnected ? 'Conectado' : 'Desconectado'}
+              color={isConnected ? 'success' : 'error'}
+              variant="outlined"
+            />
+            
+            {/* Quantidade de Motoristas Online */}
+            <Chip
+              icon={<DirectionsCar />}
+              label={`${availableVehicles.filter(v => v.status === 'disponivel').length} Motoristas Disponíveis`}
+              color="primary"
+              variant="outlined"
+            />
+            
+            {/* Botão de Refresh */}
+            <Button
+              variant="outlined"
+              onClick={refreshData}
+              disabled={loading}
+              startIcon={loading ? <Stop /> : <PlayArrow />}
+            >
+              {loading ? 'Atualizando...' : 'Atualizar'}
+            </Button>
+            
+            {/* Chamadas Pendentes */}
+            <Badge badgeContent={incomingCalls.length} color="error">
+              <Chip
+                icon={<Notifications />}
+                label="Pendentes"
+                color={incomingCalls.length > 0 ? 'warning' : 'default'}
+                variant="outlined"
+              />
+            </Badge>
+          </Box>
+        </Box>
+        
+        {/* Erro */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
       </Paper>
 
       {/* Navigation Tabs */}
