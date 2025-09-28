@@ -13,44 +13,46 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
+  IconButton,
   Badge,
-  Alert
+  Alert,
+  LinearProgress
 } from '@mui/material';
 import {
   DirectionsCar as CarIcon,
   Person as PersonIcon,
+  Phone as PhoneIcon,
+  LocationOn as LocationIcon,
+  Schedule as TimeIcon,
   Notifications as NotificationIcon,
   Chat as ChatIcon,
+  Speed as SpeedIcon,
+  LocalGasStation as FuelIcon,
   CheckCircle as AvailableIcon,
   Cancel as UnavailableIcon,
   Warning as WarningIcon
 } from '@mui/icons-material';
 
 import DriverRideModal from '../components/driver/DriverRideModal';
-import { useAuth } from '../contexts/AuthContext';
-import { useSocket } from '../contexts/SocketContext';
 
-const DashboardDriverPage = () => {
-  const { user } = useAuth();
-  const { socket, isConnected } = useSocket();
-
+const DriverDashboard = () => {
   // Estados
   const [driverStatus, setDriverStatus] = useState('available'); // available, busy, offline
   const [currentRide, setCurrentRide] = useState(null);
   const [pendingRides, setPendingRides] = useState([]);
   const [rideHistory, setRideHistory] = useState([]);
   const [notifications, setNotifications] = useState([]);
-
+  
   // Estados do modal
   const [rideModalOpen, setRideModalOpen] = useState(false);
   const [selectedRide, setSelectedRide] = useState(null);
-
-  // Informações do motorista (baseadas no usuário logado)
+  
+  // Informações do motorista (normalmente viriam da API)
   const [driverInfo] = useState({
-    id: user?.id || 1,
-    name: user?.name || 'MOTORISTA SAMU',
+    id: 1,
+    name: 'CARLOS SILVA SANTOS',
     licenseNumber: 'CNH123456789',
-    phone: user?.phone || '(42) 99999-8888',
+    phone: '(42) 99999-8888',
     vehicle: 'AMBULÂNCIA 01 - UTI MÓVEL',
     vehiclePlate: 'ABC-1234',
     shift: 'Manhã (06:00 - 18:00)',
@@ -62,72 +64,44 @@ const DashboardDriverPage = () => {
     loadPendingRides();
     loadRideHistory();
     loadNotifications();
-
-    // Simular recebimento de nova corrida a cada 30s (apenas teste)
+    
+    // Simular recebimento de nova corrida a cada 30 segundos
     const interval = setInterval(() => {
       if (driverStatus === 'available' && Math.random() > 0.7) {
         receiveNewRide();
       }
     }, 30000);
-
+    
     return () => clearInterval(interval);
   }, [driverStatus]);
 
-  const loadPendingRides = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8082';
-      const response = await fetch(`${baseUrl}/api/attendances/pending`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const attendances = Array.isArray(data) ? data : [];
-
-        const rides = attendances.map((att) => ({
-          id: att.id,
-          caller: att.patientName || att.callerName || 'Nome não informado',
-          phone: att.callerPhone || att.patientPhone || 'Telefone não informado',
-          location: `${att.address || att.originAddress || ''}${
-            att.city ? `, ${att.city}` : ''
-          }${att.state ? ` - ${att.state}` : ''}`,
-          priority:
-            att.priority === 'Alta' || att.category === 'emergency'
-              ? 'emergency'
-              : 'high',
-          time: new Date(att.createdAt || att.callDateTime || Date.now()),
-          description:
-            att.medicalCondition ||
-            att.observations ||
-            att.description ||
-            'Sem descrição médica',
-          attendanceType: att.category || att.attendanceType || 'basic',
-          attendanceNumber: att.attendanceNumber,
-          estimatedDistance: `${(Math.random() * 5 + 1).toFixed(1)} km`,
-          estimatedTime: `${Math.floor(Math.random() * 15 + 5)} min`
-        }));
-
-        setPendingRides(rides);
-      } else {
-        setPendingRides([]);
+  const loadPendingRides = () => {
+    // Simular corridas pendentes
+    const mockRides = [
+      {
+        id: 1,
+        caller: 'MARIA SANTOS',
+        phone: '(42) 99111-2222',
+        location: 'RUA XV DE NOVEMBRO, 234 - CENTRO',
+        priority: 'emergency',
+        time: new Date(),
+        description: 'PACIENTE COM DORES NO PEITO E DIFICULDADE PARA RESPIRAR',
+        attendanceNumber: 'ATD-2025-001',
+        estimatedDistance: '2.5 km',
+        estimatedTime: '8 min'
       }
-    } catch (error) {
-      console.error('Erro ao carregar corridas pendentes:', error);
-      setPendingRides([]);
-    }
+    ];
+    setPendingRides(mockRides);
   };
 
   const loadRideHistory = () => {
+    // Simular histórico
     const mockHistory = [
       {
         id: 101,
         caller: 'JOÃO OLIVEIRA',
         location: 'AV. GETÚLIO VARGAS, 567',
-        completedAt: new Date(Date.now() - 3600000),
+        completedAt: new Date(Date.now() - 3600000), // 1 hora atrás
         status: 'completed',
         duration: '45 min'
       },
@@ -135,7 +109,7 @@ const DashboardDriverPage = () => {
         id: 102,
         caller: 'ANA COSTA',
         location: 'RUA CORONEL PIRES, 123',
-        completedAt: new Date(Date.now() - 7200000),
+        completedAt: new Date(Date.now() - 7200000), // 2 horas atrás
         status: 'completed',
         duration: '32 min'
       }
@@ -165,110 +139,88 @@ const DashboardDriverPage = () => {
     setNotifications(mockNotifications);
   };
 
-  const receiveNewRide = (rideData) => {
-    const newRide =
-      rideData ||
-      {
-        id: Date.now(),
-        caller: 'PACIENTE URGENTE',
-        phone: '(42) 99000-0000',
-        location: 'LOCAL DE EMERGÊNCIA',
-        priority: 'emergency',
-        time: new Date(),
-        description: 'NOVA EMERGÊNCIA MÉDICA',
-        attendanceNumber: `ATD-${Date.now()}`,
-        estimatedDistance: `${(Math.random() * 5 + 1).toFixed(1)} km`,
-        estimatedTime: `${Math.floor(Math.random() * 15 + 5)} min`
-      };
-
-    setPendingRides((prev) => [newRide, ...prev]);
+  const receiveNewRide = () => {
+    const newRide = {
+      id: Date.now(),
+      caller: 'PACIENTE URGENTE',
+      phone: '(42) 99000-0000',
+      location: 'LOCAL DE EMERGÊNCIA',
+      priority: 'emergency',
+      time: new Date(),
+      description: 'NOVA EMERGÊNCIA MÉDICA',
+      attendanceNumber: `ATD-${Date.now()}`,
+      estimatedDistance: `${(Math.random() * 5 + 1).toFixed(1)} km`,
+      estimatedTime: `${Math.floor(Math.random() * 15 + 5)} min`
+    };
+    
+    setPendingRides(prev => [newRide, ...prev]);
+    
+    // Mostrar automaticamente o modal da nova corrida
     setSelectedRide(newRide);
     setRideModalOpen(true);
-
-    setNotifications((prev) => [
-      {
-        id: Date.now(),
-        type: 'new_ride',
-        title: 'NOVA CORRIDA!',
-        message: `${newRide.caller} - ${newRide.location}`,
-        time: new Date(),
-        read: false
-      },
-      ...prev
-    ]);
+    
+    // Adicionar notificação
+    const notification = {
+      id: Date.now(),
+      type: 'new_ride',
+      title: 'NOVA CORRIDA!',
+      message: `${newRide.caller} - ${newRide.location}`,
+      time: new Date(),
+      read: false
+    };
+    setNotifications(prev => [notification, ...prev]);
   };
 
   const handleAcceptRide = (ride, vehicleData) => {
+    console.log('Corrida aceita:', ride, vehicleData);
+    
     // Remove da lista de pendentes
-    setPendingRides((prev) => prev.filter((r) => r.id !== ride.id));
-    // Define corrida atual
+    setPendingRides(prev => prev.filter(r => r.id !== ride.id));
+    
+    // Define como corrida atual
     setCurrentRide({ ...ride, vehicleData, status: 'accepted' });
     setDriverStatus('busy');
-    // Adiciona ao histórico (como em andamento)
-    setRideHistory((prev) => [
-      {
-        ...ride,
-        acceptedAt: new Date(),
-        status: 'in_progress',
-        vehicleData
-      },
-      ...prev
-    ]);
-    setRideModalOpen(false);
+    
+    // Adicionar ao histórico
+    setRideHistory(prev => [{
+      ...ride,
+      acceptedAt: new Date(),
+      status: 'in_progress',
+      vehicleData
+    }, ...prev]);
   };
 
   const handleDeclineRide = (ride) => {
-    setPendingRides((prev) => prev.filter((r) => r.id !== ride.id));
-    setRideModalOpen(false);
+    console.log('Corrida recusada:', ride);
+    
+    // Remove da lista de pendentes
+    setPendingRides(prev => prev.filter(r => r.id !== ride.id));
   };
 
   const toggleDriverStatus = () => {
     const newStatus = driverStatus === 'available' ? 'offline' : 'available';
     setDriverStatus(newStatus);
-    if (newStatus === 'offline') setCurrentRide(null);
+    
+    if (newStatus === 'offline') {
+      setCurrentRide(null);
+    }
   };
-
-  // Socket listeners
-  useEffect(() => {
-    if (!socket || !isConnected) return;
-
-    socket.on('status_update', (data) => {
-      console.log('Atualização de status:', data);
-    });
-
-    socket.on('new_ride', (rideData) => {
-      receiveNewRide(rideData);
-    });
-
-    return () => {
-      socket.off('status_update');
-      socket.off('new_ride');
-    };
-  }, [socket, isConnected]);
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available':
-        return 'success';
-      case 'busy':
-        return 'warning';
-      case 'offline':
-        return 'error';
-      default:
-        return 'default';
+      case 'available': return 'success';
+      case 'busy': return 'warning';
+      case 'offline': return 'error';
+      default: return 'default';
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'available':
-        return 'DISPONÍVEL';
-      case 'busy':
-        return 'EM CORRIDA';
-      case 'offline':
-        return 'OFFLINE';
-      default:
-        return 'DESCONHECIDO';
+      case 'available': return 'DISPONÍVEL';
+      case 'busy': return 'EM CORRIDA';
+      case 'offline': return 'OFFLINE';
+      default: return 'DESCONHECIDO';
     }
   };
 
@@ -282,7 +234,7 @@ const DashboardDriverPage = () => {
               <PersonIcon sx={{ fontSize: 32 }} />
             </Avatar>
           </Grid>
-          <Grid item sx={{ flex: 1 }}>
+          <Grid item flex={1}>
             <Typography variant="h5" gutterBottom>
               {driverInfo.name}
             </Typography>
@@ -295,31 +247,22 @@ const DashboardDriverPage = () => {
           </Grid>
           <Grid item>
             <Box textAlign="center">
-              <Chip
-                icon={
-                  driverStatus === 'available' ? (
-                    <AvailableIcon />
-                  ) : driverStatus === 'busy' ? (
-                    <WarningIcon />
-                  ) : (
-                    <UnavailableIcon />
-                  )
-                }
+              <Chip 
+                icon={driverStatus === 'available' ? <AvailableIcon /> : 
+                      driverStatus === 'busy' ? <WarningIcon /> : <UnavailableIcon />}
                 label={getStatusText(driverStatus)}
                 color={getStatusColor(driverStatus)}
                 variant="filled"
                 sx={{ mb: 1, fontWeight: 'bold' }}
               />
               <Box>
-                <Button
-                  variant="outlined"
+                <Button 
+                  variant="outlined" 
                   color="inherit"
                   onClick={toggleDriverStatus}
                   disabled={driverStatus === 'busy'}
                 >
-                  {driverStatus === 'available'
-                    ? 'Ficar Offline'
-                    : 'Ficar Disponível'}
+                  {driverStatus === 'available' ? 'Ficar Offline' : 'Ficar Disponível'}
                 </Button>
               </Box>
             </Box>
@@ -339,19 +282,13 @@ const DashboardDriverPage = () => {
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={8}>
-                    <Typography>
-                      <strong>Paciente:</strong> {currentRide.caller}
-                    </Typography>
-                    <Typography>
-                      <strong>Local:</strong> {currentRide.location}
-                    </Typography>
-                    <Typography>
-                      <strong>Condição:</strong> {currentRide.description}
-                    </Typography>
+                    <Typography><strong>Paciente:</strong> {currentRide.caller}</Typography>
+                    <Typography><strong>Local:</strong> {currentRide.location}</Typography>
+                    <Typography><strong>Condição:</strong> {currentRide.description}</Typography>
                   </Grid>
                   <Grid item xs={12} md={4}>
-                    <Button
-                      fullWidth
+                    <Button 
+                      fullWidth 
                       variant="contained"
                       onClick={() => {
                         setSelectedRide(currentRide);
@@ -378,41 +315,26 @@ const DashboardDriverPage = () => {
                   <Badge badgeContent={pendingRides.length} color="error" sx={{ ml: 2 }} />
                 )}
               </Typography>
-
+              
               {pendingRides.length === 0 ? (
                 <Alert severity="info">
-                  Nenhuma corrida pendente no momento. Status:{' '}
-                  {getStatusText(driverStatus)}
+                  Nenhuma corrida pendente no momento. Status: {getStatusText(driverStatus)}
                 </Alert>
               ) : (
                 <List>
                   {pendingRides.map((ride) => (
-                    <ListItem
+                    <ListItem 
                       key={ride.id}
-                      sx={{
+                      sx={{ 
                         border: '1px solid #e0e0e0',
                         borderRadius: 1,
                         mb: 1,
-                        bgcolor:
-                          ride.priority === 'emergency'
-                            ? 'error.light'
-                            : 'background.paper'
+                        bgcolor: ride.priority === 'emergency' ? 'error.light' : 'background.paper'
                       }}
                     >
                       <ListItemAvatar>
-                        <Avatar
-                          sx={{
-                            bgcolor:
-                              ride.priority === 'emergency'
-                                ? 'error.main'
-                                : 'primary.main'
-                          }}
-                        >
-                          {ride.priority === 'emergency' ? (
-                            <WarningIcon />
-                          ) : (
-                            <PersonIcon />
-                          )}
+                        <Avatar sx={{ bgcolor: ride.priority === 'emergency' ? 'error.main' : 'primary.main' }}>
+                          {ride.priority === 'emergency' ? <WarningIcon /> : <PersonIcon />}
                         </Avatar>
                       </ListItemAvatar>
                       <ListItemText
@@ -421,31 +343,24 @@ const DashboardDriverPage = () => {
                             <Typography variant="subtitle1">
                               {ride.caller}
                             </Typography>
-                            <Chip
-                              size="small"
-                              label={
-                                ride.priority === 'emergency'
-                                  ? 'EMERGÊNCIA'
-                                  : 'ALTA'
-                              }
-                              color={
-                                ride.priority === 'emergency'
-                                  ? 'error'
-                                  : 'warning'
-                              }
+                            <Chip 
+                              size="small" 
+                              label={ride.priority === 'emergency' ? 'EMERGÊNCIA' : 'ALTA'}
+                              color={ride.priority === 'emergency' ? 'error' : 'warning'}
                             />
                           </Box>
                         }
                         secondary={
                           <Box>
-                            <Typography variant="body2">📍 {ride.location}</Typography>
-                            <Typography variant="body2">🏥 {ride.description}</Typography>
+                            <Typography variant="body2">
+                              📍 {ride.location}
+                            </Typography>
+                            <Typography variant="body2">
+                              🏥 {ride.description}
+                            </Typography>
                             <Typography variant="caption">
-                              📞 {ride.phone} • ⏱️{' '}
-                              {ride.time instanceof Date
-                                ? ride.time.toLocaleTimeString()
-                                : new Date(ride.time).toLocaleTimeString()}{' '}
-                              • 🚗 {ride.estimatedDistance} • ⏰ {ride.estimatedTime}
+                              📞 {ride.phone} • ⏱️ {ride.time.toLocaleTimeString()} • 
+                              🚗 {ride.estimatedDistance} • ⏰ {ride.estimatedTime}
                             </Typography>
                           </Box>
                         }
@@ -480,15 +395,19 @@ const DashboardDriverPage = () => {
               <Grid container spacing={2}>
                 <Grid item xs={6}>
                   <Typography variant="h4" color="primary">
-                    {rideHistory.filter((r) => r.status === 'completed').length}
+                    {rideHistory.filter(r => r.status === 'completed').length}
                   </Typography>
-                  <Typography variant="caption">Corridas Completas</Typography>
+                  <Typography variant="caption">
+                    Corridas Completas
+                  </Typography>
                 </Grid>
                 <Grid item xs={6}>
                   <Typography variant="h4" color="warning.main">
                     {pendingRides.length}
                   </Typography>
-                  <Typography variant="caption">Pendentes</Typography>
+                  <Typography variant="caption">
+                    Pendentes
+                  </Typography>
                 </Grid>
               </Grid>
             </CardContent>
@@ -501,7 +420,7 @@ const DashboardDriverPage = () => {
                 <ChatIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                 Notificações
               </Typography>
-
+              
               {notifications.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   Nenhuma notificação
@@ -533,9 +452,11 @@ const DashboardDriverPage = () => {
               <Typography variant="h6" gutterBottom>
                 Histórico Recente
               </Typography>
-
+              
               {rideHistory.length === 0 ? (
-                <Alert severity="info">Nenhuma corrida no histórico hoje</Alert>
+                <Alert severity="info">
+                  Nenhuma corrida no histórico hoje
+                </Alert>
               ) : (
                 <List>
                   {rideHistory.slice(0, 5).map((ride) => (
@@ -549,19 +470,18 @@ const DashboardDriverPage = () => {
                         primary={ride.caller}
                         secondary={
                           <Box>
-                            <Typography variant="body2">📍 {ride.location}</Typography>
+                            <Typography variant="body2">
+                              📍 {ride.location}
+                            </Typography>
                             <Typography variant="caption">
-                              ✅ Concluída às{' '}
-                              {ride.completedAt instanceof Date
-                                ? ride.completedAt.toLocaleTimeString()
-                                : new Date(ride.completedAt).toLocaleTimeString()}{' '}
-                              • ⏱️ Duração: {ride.duration}
+                              ✅ Concluída às {ride.completedAt?.toLocaleTimeString()} • 
+                              ⏱️ Duração: {ride.duration}
                             </Typography>
                           </Box>
                         }
                       />
-                      <Chip
-                        size="small"
+                      <Chip 
+                        size="small" 
                         label={ride.status === 'completed' ? 'Concluída' : 'Em Andamento'}
                         color={ride.status === 'completed' ? 'success' : 'warning'}
                       />
@@ -587,4 +507,4 @@ const DashboardDriverPage = () => {
   );
 };
 
-export default DashboardDriverPage;
+export default DriverDashboard;

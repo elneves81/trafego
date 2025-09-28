@@ -20,17 +20,22 @@ export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
 
   useEffect(() => {
+    let socketInstance = null;
 
     if (user && localStorage.getItem('token')) {
       // Conectar ao servidor WebSocket
-      const socketInstance = io(process.env.REACT_APP_API_URL || 'http://10.0.134.79:8082', {
+      socketInstance = io('http://localhost:8082', {
         auth: {
           token: localStorage.getItem('token'),
           userId: user.id,
           userType: user.userType,
           userName: user.name
         },
-        transports: ['websocket', 'polling']
+        transports: ['polling', 'websocket'], // Polling primeiro para evitar erros
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 2000,
+        timeout: 10000
       });
 
       // Eventos de conexão
@@ -204,19 +209,25 @@ export const SocketProvider = ({ children }) => {
       // Cleanup
       return () => {
         console.log('Desconectando socket...');
-        socketInstance.disconnect();
+        if (socketInstance) {
+          socketInstance.disconnect();
+        }
         setSocket(null);
         setIsConnected(false);
+        setOnlineUsers([]);
       };
-    } else {
-      // Se não há usuário, desconectar
+    }
+
+    // Cleanup se não há usuário
+    return () => {
       if (socket) {
         socket.disconnect();
         setSocket(null);
         setIsConnected(false);
+        setOnlineUsers([]);
       }
-    }
-  }, [user, socket]);
+    };
+  }, [user?.id]);
 
   // Solicitar permissão para notificações
   useEffect(() => {

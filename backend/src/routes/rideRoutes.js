@@ -9,6 +9,8 @@ const {
   updateRideStatus,
   cancelRide,
   getActiveRides,
+  getAvailableRides,
+  getCurrentRide,
   getRideHistory,
   getRideStats
 } = require('../controllers/rideController');
@@ -153,6 +155,8 @@ router.use(authenticate);
 // Rotas principais
 router.get('/', authorize('admin', 'supervisor', 'operator'), getRides);
 router.get('/active', authorize('admin', 'supervisor', 'operator', 'driver'), getActiveRides);
+router.get('/available', authorize('driver'), getAvailableRides);
+router.get('/current', authorize('driver'), getCurrentRide);
 router.get('/history', authorize('admin', 'supervisor', 'operator', 'driver'), getRideHistory);
 router.get('/stats', authorize('admin', 'supervisor'), getRideStats);
 

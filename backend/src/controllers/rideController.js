@@ -701,6 +701,82 @@ const getRideStats = async (req, res) => {
   }
 };
 
+// Buscar corridas disponíveis para motoristas
+const getAvailableRides = async (req, res) => {
+  try {
+    console.log('🚗 Buscando corridas disponíveis para motorista:', req.user.id);
+    
+    const rides = await Ride.findAll({
+      where: {
+        driverId: req.user.id, // Corridas atribuídas a este motorista
+        status: 'pending' // Status pendente (aguardando aceitação)
+      },
+      include: [
+        {
+          model: User,
+          as: 'operator',
+          attributes: ['id', 'name', 'phone']
+        }
+      ],
+      order: [['priority', 'DESC'], ['requestedDateTime', 'ASC']],
+      limit: 20
+    });
+
+    console.log(`✅ Encontradas ${rides.length} corridas disponíveis`);
+    res.json(rides);
+  } catch (error) {
+    console.error('❌ Erro ao buscar corridas disponíveis:', error);
+    logger.error('Error fetching available rides:', error);
+    res.status(500).json({ 
+      message: 'Erro interno do servidor',
+      error: error.message 
+    });
+  }
+};
+
+// Buscar corrida atual do motorista
+const getCurrentRide = async (req, res) => {
+  try {
+    console.log('🚗 Buscando corrida atual do motorista:', req.user.id);
+    
+    const currentRide = await Ride.findOne({
+      where: {
+        driverId: req.user.id,
+        status: {
+          [Op.in]: ['accepted', 'started', 'arrived_origin', 'departed_origin', 'arrived_destination']
+        }
+      },
+      include: [
+        {
+          model: User,
+          as: 'operator',
+          attributes: ['id', 'name', 'phone']
+        },
+        {
+          model: Vehicle,
+          attributes: ['id', 'plateNumber', 'model', 'vehicleType']
+        }
+      ],
+      order: [['acceptedAt', 'DESC']]
+    });
+
+    if (currentRide) {
+      console.log(`✅ Corrida atual encontrada: ${currentRide.rideNumber}`);
+    } else {
+      console.log('📝 Nenhuma corrida ativa para este motorista');
+    }
+    
+    res.json(currentRide);
+  } catch (error) {
+    console.error('❌ Erro ao buscar corrida atual:', error);
+    logger.error('Error fetching current ride:', error);
+    res.status(500).json({ 
+      message: 'Erro interno do servidor',
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   getRides,
   getRideById,
@@ -710,6 +786,8 @@ module.exports = {
   updateRideStatus,
   cancelRide,
   getActiveRides,
+  getAvailableRides,
+  getCurrentRide,
   getRideHistory,
   getRideStats
 };

@@ -37,7 +37,12 @@ import {
 } from '@mui/icons-material';
 import api from '../../services/api';
 
-const BasicAttendanceList = () => {
+const BasicAttendanceList = ({ 
+  title = "Atendimentos Básicos",
+  showAddButton = true,
+  className = "",
+  refreshTrigger = 0
+}) => {
   const [attendances, setAttendances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -54,7 +59,19 @@ const BasicAttendanceList = () => {
       
       if (response.data.success) {
         const attendancesData = response.data.data?.attendances || [];
-        setAttendances(attendancesData);
+        
+        // Filtrar apenas por IDs únicos (sem filtrar pacientes duplicados)
+        const uniqueAttendances = attendancesData.filter((attendance, index, self) => 
+          index === self.findIndex(a => a.id === attendance.id)
+        );
+        
+        if (uniqueAttendances.length !== attendancesData.length) {
+          console.info(`🔄 ${attendancesData.length - uniqueAttendances.length} registros duplicados removidos (baseado em ID) - Total carregado: ${uniqueAttendances.length}`);
+        } else {
+          console.log(`✅ ${uniqueAttendances.length} atendimentos carregados sem duplicatas`);
+        }
+        
+        setAttendances(uniqueAttendances);
       } else {
         setError('Erro ao carregar atendimentos');
       }
@@ -67,8 +84,27 @@ const BasicAttendanceList = () => {
   };
 
   useEffect(() => {
-    loadAttendances();
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      if (isMounted) {
+        await loadAttendances();
+      }
+    };
+    
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // Recarregar quando refreshTrigger mudar
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      loadAttendances();
+    }
+  }, [refreshTrigger]);
 
   // Filtrar e pesquisar atendimentos
   const filteredAttendances = attendances.filter(attendance => {
@@ -236,8 +272,8 @@ const BasicAttendanceList = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAttendances.map((attendance) => (
-                    <TableRow key={attendance.id} hover>
+                  filteredAttendances.map((attendance, index) => (
+                    <TableRow key={`attendance-${attendance.id || attendance.attendanceNumber}-${Date.now()}-${index}`} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight="bold">
                           {attendance.attendanceNumber || `#${attendance.id}`}

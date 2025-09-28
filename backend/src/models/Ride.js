@@ -1,3 +1,5 @@
+const { Op } = require('sequelize');
+
 module.exports = (sequelize, DataTypes) => {
   const Ride = sequelize.define('Ride', {
     id: {
@@ -250,7 +252,7 @@ module.exports = (sequelize, DataTypes) => {
     const lastRide = await Ride.findOne({
       where: {
         rideNumber: {
-          [sequelize.Sequelize.Op.like]: `${dateString}%`
+          [Op.like]: `${dateString}%`
         }
       },
       order: [['rideNumber', 'DESC']]
@@ -269,7 +271,7 @@ module.exports = (sequelize, DataTypes) => {
   Ride.addScope('active', {
     where: {
       status: {
-        [sequelize.Sequelize.Op.notIn]: ['completed', 'cancelled']
+        [Op.notIn]: ['completed', 'cancelled']
       }
     }
   });
@@ -289,7 +291,7 @@ module.exports = (sequelize, DataTypes) => {
   Ride.addScope('today', {
     where: {
       requestedDateTime: {
-        [sequelize.Sequelize.Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
+        [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0))
       }
     }
   });

@@ -24,9 +24,41 @@ const systemRoutes = require('./src/routes/systemRoutes');
 const attendanceRoutes = require('./src/routes/attendanceRoutes');
 const appointmentRoutes = require('./src/routes/appointmentRoutes');
 const cepRoutes = require('./src/routes/cepRoutes');
+const driverWorkloadRoutes = require('./src/routes/driverWorkloadRoutes');
 
 const app = express();
 const server = http.createServer(app);
+
+// Configurar Socket.IO
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: [
+      'http://localhost:3006',
+      'http://10.0.50.79:3006',
+      'http://10.0.134.79:3006'
+    ],
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['polling', 'websocket']
+});
+
+// Socket.IO event handlers
+const socketAuth = require('./src/socket/socketAuth');
+const socketHandlers = require('./src/socket/socketHandlers');
+
+io.use(socketAuth);
+io.on('connection', (socket) => {
+  console.log(`Cliente conectado: ${socket.id} | Usuário: ${socket.user?.name || 'Anônimo'}`);
+  
+  // Configurar handlers
+  socketHandlers(io, socket);
+  
+  socket.on('disconnect', (reason) => {
+    console.log(`Cliente desconectado: ${socket.id} | Motivo: ${reason}`);
+  });
+});
 
 // Configurações básicas
 const PORT = process.env.PORT || 8082;
@@ -34,10 +66,22 @@ const PORT = process.env.PORT || 8082;
 // Configurar trust proxy para express-rate-limit
 app.set('trust proxy', 1);
 
-// Rate limiting
+// Rate limiting - Configuração mais permissiva para desenvolvimento
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100 // Limite de 100 requests por IP por janela de tempo
+  max: 1000, // Limite aumentado para 1000 requests por IP por janela de tempo
+  message: {
+    error: 'Muitas requisições vindas deste IP, tente novamente em alguns minutos.',
+    retryAfter: '15 minutos'
+  },
+  standardHeaders: true, // Retorna rate limit info nos headers `RateLimit-*`
+  legacyHeaders: false, // Desabilita os headers `X-RateLimit-*`
+  // Pular rate limiting para IPs locais (desenvolvimento)
+  skip: (req) => {
+    const ip = req.ip || req.connection.remoteAddress;
+    const localIPs = ['127.0.0.1', '::1', '10.0.134.79', 'localhost'];
+    return localIPs.some(localIP => ip.includes(localIP));
+  }
 });
 
 // Middlewares globais
@@ -119,6 +163,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/rides', rideRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/driver-management', driverWorkloadRoutes);
+// TEMPORÁRIO: Duplicar rotas anti-fujão sem /api para depuração
+app.use('/driver-management', driverWorkloadRoutes);
 app.use('/api/system', systemRoutes);
 app.use('/api/gps', gpsRoutes);
 app.use('/api/notifications', notificationRoutes);

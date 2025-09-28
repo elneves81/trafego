@@ -133,7 +133,7 @@ const AttendanceList = () => {
     if (!selectedAttendance) return;
 
     try {
-      const response = await api.patch(`/attendances/${selectedAttendance.id}/approve`);
+      const response = await api.post(`/attendances/${selectedAttendance.id}/approve`);
 
       if (response.data.success) {
         setApproveDialog(false);

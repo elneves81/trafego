@@ -9,6 +9,7 @@ import { ToastContainer } from 'react-toastify';
 
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
 import createEmotionCache from './createEmotionCache';
 
 import 'react-toastify/dist/ReactToastify.css';
@@ -199,19 +200,21 @@ root.render(
           <ThemeProvider theme={systemTheme}>
             <CssBaseline />
             <AuthProvider>
-              <App />
-              <ToastContainer
-                position="top-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-              />
+              <SocketProvider>
+                <App />
+                <ToastContainer
+                  position="top-right"
+                  autoClose={5000}
+                  hideProgressBar={false}
+                  newestOnTop={false}
+                  closeOnClick
+                  rtl={false}
+                  pauseOnFocusLoss
+                  draggable
+                  pauseOnHover
+                  theme="light"
+                />
+              </SocketProvider>
             </AuthProvider>
           </ThemeProvider>
         </QueryClientProvider>

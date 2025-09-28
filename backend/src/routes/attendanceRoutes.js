@@ -7,7 +7,9 @@ const {
   updateAttendance,
   approveAttendance,
   cancelAttendance,
-  getAttendanceStats
+  getAttendanceStats,
+  intelligentDispatch,
+  multiDriverDispatch
 } = require('../controllers/attendanceController');
 const { authenticate, authorize } = require('../middleware/auth');
 
@@ -172,7 +174,7 @@ router.get('/pending',
       
       const pendingAttendances = await Attendance.findAll({
         where: { 
-          status: 'pending' 
+          status: 'Recebida' // Usando status correto do ENUM
         },
         include: [
           {
@@ -247,6 +249,20 @@ router.get('/stats/summary',
   authenticate,
   authorize('admin', 'supervisor'),
   getAttendanceStats
+);
+
+// Distribuição inteligente de corridas - Aprova atendimentos e cria corridas automaticamente
+router.post('/intelligent-dispatch', 
+  authenticate,
+  authorize('admin', 'supervisor'),
+  intelligentDispatch
+);
+
+// 🚀 Distribuição avançada para múltiplos motoristas com análise detalhada
+router.post('/multi-driver-dispatch', 
+  authenticate,
+  authorize('admin', 'supervisor'),
+  multiDriverDispatch
 );
 
 module.exports = router;
