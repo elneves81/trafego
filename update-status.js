@@ -6,7 +6,7 @@ async function updateStatus() {
     
     // Atualizar todos os registros com status vazio
     const result = await sequelize.query(
-      "UPDATE attendances SET status = 'pending' WHERE status = '' OR status IS NULL",
+      "UPDATE attendances SET status = 'Recebida' WHERE status = '' OR status IS NULL",
       { type: sequelize.QueryTypes.UPDATE }
     );
     
@@ -14,11 +14,11 @@ async function updateStatus() {
     
     // Verificar resultado
     const check = await sequelize.query(
-      "SELECT id, attendanceNumber, patientName, status FROM attendances WHERE status = 'pending' ORDER BY id DESC",
+      "SELECT id, attendanceNumber, patientName, status FROM attendances WHERE status = 'Recebida' ORDER BY id DESC",
       { type: sequelize.QueryTypes.SELECT }
     );
     
-    console.log('📋 ATENDIMENTOS PENDENTES AGORA:', check.length);
+    console.log('📋 ATENDIMENTOS RECEBIDOS AGORA:', check.length);
     check.forEach(c => console.log('  -', c.attendanceNumber, '|', c.patientName, '| Status:', c.status));
     
     if (check.length > 0) {

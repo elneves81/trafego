@@ -18,14 +18,14 @@ async function fixAttendances() {
     
     console.log(`📝 Encontrados ${nullStatusAttendances.length} atendimentos com status a corrigir`);
     
-    // Atualizar para pending
+    // Atualizar para Recebida (status inicial)
     for (const att of nullStatusAttendances) {
       await att.update({ 
-        status: 'pending',
+        status: 'Recebida',
         priority: att.priority || 'Média',
         category: att.category || 'basic'
       });
-      console.log(`✅ Corrigido: ${att.attendanceNumber || att.id} -> status: pending`);
+      console.log(`✅ Corrigido: ${att.attendanceNumber || att.id} -> status: Recebida`);
     }
     
     // 2. Criar alguns atendimentos novos com dados completos
@@ -44,7 +44,7 @@ async function fixAttendances() {
         priority: 'Alta',
         urgencyLevel: 'urgent',
         category: 'emergency',
-        status: 'pending',
+        status: 'Recebida',
         callDateTime: new Date(),
         operatorId: 1,
         patientAge: 68,
@@ -64,7 +64,7 @@ async function fixAttendances() {
         priority: 'Alta',
         urgencyLevel: 'critical',
         category: 'emergency',
-        status: 'pending',
+        status: 'Recebida',
         callDateTime: new Date(),
         operatorId: 1,
         patientAge: 5,
@@ -84,7 +84,7 @@ async function fixAttendances() {
         priority: 'Média',
         urgencyLevel: 'moderate',
         category: 'basic',
-        status: 'pending',
+        status: 'Recebida',
         callDateTime: new Date(),
         operatorId: 1,
         patientAge: 75,
@@ -107,16 +107,16 @@ async function fixAttendances() {
     console.log('\n📊 VERIFICAÇÃO FINAL...');
     
     const pendingCount = await Attendance.count({
-      where: { status: 'pending' }
+      where: { status: 'Recebida' }
     });
     
     const allPending = await Attendance.findAll({
-      where: { status: 'pending' },
+      where: { status: 'Recebida' },
       order: [['createdAt', 'DESC']],
       limit: 10
     });
     
-    console.log(`\n✅ Total de atendimentos pendentes: ${pendingCount}`);
+    console.log(`\n✅ Total de atendimentos recebidos: ${pendingCount}`);
     
     if (allPending.length > 0) {
       console.log('\n📞 CHAMADAS PRONTAS PARA DESPACHO:');

@@ -196,8 +196,8 @@ router.post('/assign',
         return res.status(404).json({ message: 'Atendimento não encontrado' });
       }
       
-      if (attendance.status !== 'pending') {
-        return res.status(400).json({ message: 'Atendimento não está pendente' });
+      if (attendance.status !== 'Recebida') {
+        return res.status(400).json({ message: 'Atendimento não está recebido/pendente' });
       }
       
       // Criar corrida baseada no atendimento
