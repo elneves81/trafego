@@ -20,9 +20,9 @@ async function testAttendances() {
         console.log(`${i+1}. [${att.id}] ${att.attendanceNumber || 'N/A'} | ${att.patientName || att.callerName} | Status: ${att.status} | Categoria: ${att.category || 'N/A'}`);
       });
       
-      // Verificar pendentes
-      const pending = allAttendances.filter(a => a.status === 'pending');
-      console.log(`\n⏳ Atendimentos pendentes: ${pending.length}`);
+      // Verificar pendentes (status Recebida)
+      const pending = allAttendances.filter(a => a.status === 'Recebida');
+      console.log(`\n⏳ Atendimentos recebidos/pendentes: ${pending.length}`);
       
       if (pending.length === 0) {
         console.log('\n💡 Não há atendimentos pendentes. Vou criar alguns para teste...');
@@ -42,7 +42,7 @@ async function testAttendances() {
             symptoms: 'Dor intensa no peito, sudorese, falta de ar',
             priority: 'Alta',
             category: 'emergency',
-            status: 'pending',
+            status: 'Recebida',
             callDateTime: new Date(),
             operatorId: 1,
             patientAge: 65,
@@ -61,7 +61,7 @@ async function testAttendances() {
             symptoms: 'Dor intensa no braço direito, inchaço, não consegue mexer',
             priority: 'Média',
             category: 'basic',
-            status: 'pending',
+            status: 'Recebida',
             callDateTime: new Date(),
             operatorId: 1,
             patientAge: 72,
@@ -80,7 +80,7 @@ async function testAttendances() {
             symptoms: 'Inconsciente, respiração irregular',
             priority: 'Alta',
             category: 'emergency',
-            status: 'pending',
+            status: 'Recebida',
             callDateTime: new Date(),
             operatorId: 1,
             patientAge: 58,
@@ -120,7 +120,7 @@ async function testAttendances() {
           medicalCondition: 'MAL-ESTAR E TONTURA',
           priority: 'Baixa',
           category: 'basic',
-          status: 'pending',
+          status: 'Recebida',
           callDateTime: new Date(),
           operatorId: 1
         }
@@ -138,14 +138,14 @@ async function testAttendances() {
     const pendingAttendances = await Attendance.findAll({
       where: {
         status: {
-          [Op.in]: ['pending', 'waiting']
+          [Op.in]: ['Recebida', 'Triagem']
         }
       },
       order: [['createdAt', 'DESC']],
       limit: 10
     });
     
-    console.log(`📋 Encontrados ${pendingAttendances.length} atendimentos pendentes para a API`);
+    console.log(`📋 Encontrados ${pendingAttendances.length} atendimentos recebidos/triagem para a API`);
     
     if (pendingAttendances.length > 0) {
       console.log('\n📞 CHAMADAS PARA DESPACHO:');

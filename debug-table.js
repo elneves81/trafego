@@ -20,7 +20,7 @@ async function debugTable() {
     
     // Tentar update simples
     console.log('\n🔧 TENTANDO ATUALIZAÇÃO...');
-    const result = await sequelize.query("UPDATE attendances SET status = 'pending' WHERE id = 19");
+    const result = await sequelize.query("UPDATE attendances SET status = 'Recebida' WHERE id = 19");
     console.log('Resultado:', result);
     
     // Verificar
